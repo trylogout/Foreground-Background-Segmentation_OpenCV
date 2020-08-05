@@ -24,22 +24,26 @@ inline bool exists_test(const std::string& name) {
 int main(int argc, char* argv[])
 {
     bool show = false;
+    string filename = "path\\to\\file";
+    string savedir = "path\\to\\dir\\toSaveFiles";
 	VideoCapture cap;
-    if (exists_test("C:\\repos\\PlayGround\\PlayGround\\small.mp4")) {
-        printf("FILE EXIST");
-        cap.open("C:\\case.mkv");
+
+    // make simple frame and MOG2 mask
+    Mat frame, MOGMask, foregroundImg, backgroundImage, backgroundImg;
+
+    if (exists_test(filename)) {
+        cap.open(filename);
     }
     
-    //init MOG2 BackgroundSubstractor
+    // init MOG2 BackgroundSubstractor
     Ptr<BackgroundSubtractor> BackgroundSubstractor;
     BackgroundSubstractor = createBackgroundSubtractorMOG2().dynamicCast<BackgroundSubtractor>();;
 
-    //make simple frame and MOG2 mask for frame
-    Mat frame, MOGMask, foregroundImg, backgroundImage, BackgroundImg;
+    int iCount = 0;
 
-    int i_count = 0;
     while (true) {
-        i_count++;
+        iCount++;
+
         cap >> frame;
         if (frame.empty())
             break;
@@ -62,26 +66,26 @@ int main(int argc, char* argv[])
             FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
 
         foregroundImg = Scalar::all(0);
-        BackgroundImg = Scalar::all(0);
+        backgroundImg = Scalar::all(0);
         frame.copyTo(foregroundImg, MOGMask);
 
         backgroundImage = 255 - MOGMask;
-        frame.copyTo(BackgroundImg, backgroundImage);
+        frame.copyTo(backgroundImg, backgroundImage);
 
         if (show){
             imshow("Frame", frame);
-            imshow("BackGround", BackgroundImg);
+            imshow("BackGround", backgroundImg);
             imshow("ForeGround", foregroundImg);
             imshow("MOG2 Mask", MOGMask);
         }
 
 
         if (i_count != 1) {
-            std::string counter = std::to_string(i_count);
+            string counter = std::to_string(iCount);
 
-            imwrite("C:/images/original/Frame" + counter + ".jpg", frame);
-            imwrite("C:/images/background/Frame" + counter + ".jpg", BackgroundImg);
-            imwrite("C:/images/foreground/Frame" + counter + ".jpg", foregroundImg);
+            imwrite(savedir + "/original/Frames" + counter + ".jpg", frame);
+            imwrite(savedir + "/background/Frames" + counter + ".jpg", backgroundImg);
+            imwrite(savedir + "/foreground/Frames" + counter + ".jpg", foregroundImg);
         }
 
         int keyboard = waitKey(30);
