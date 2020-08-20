@@ -18,8 +18,8 @@ using namespace cv;
 
 
 inline bool exists_test(const string& name) {
-	struct stat buffer;
-	return (stat(name.c_str(), &buffer) == 0);
+    struct stat buffer;
+    return (stat(name.c_str(), &buffer) == 0);
 }
 
 // /////////////////////////////////////////////////////
@@ -30,9 +30,10 @@ inline bool exists_test(const string& name) {
 //      frameSize = width and height of images
 //      fps = frmaes per second on output video file
 //      dirPath = path to dir with images
-void videoWriter(string filename,string videoOutputPath, 
-                Size frameSize, double fps, 
-                string dirPath)
+
+void videoWriter(string filename, string videoOutputPath,
+    Size frameSize, double fps,
+    string dirPath)
 {
     VideoCapture inputVideo(dirPath);
     Mat frame;
@@ -51,7 +52,7 @@ void videoWriter(string filename,string videoOutputPath,
     glob(dirPath, fn, false);
 
     size_t imgCount = fn.size();
-    for (size_t iCount = 0; iCount < imgCount; iCount++){
+    for (size_t iCount = 0; iCount < imgCount; iCount++) {
         cout << "Frame " + to_string(iCount) + " out of " + to_string(imgCount) << endl;
         frame = imread(fn[iCount]);
         Mat xframe;
@@ -65,27 +66,29 @@ void videoWriter(string filename,string videoOutputPath,
 
 int main(int argc, char* argv[])
 {
-    bool showFrames = false;
+    bool showFrames = true;
     bool saveImages = false;
-    bool saveVideo = true;
+    bool saveVideo = false;
 
     string filename = "path\\to\\videoFile";
     string savedir = "path\\to\\dir\\toSaveFiles";
     string foregroundPath = "path\\to\\dir\\withForegroundImages";
     string backgroundPath = "path\\to\\dir\\withBackgroundImages";
 
-	VideoCapture cap;
+    VideoCapture cap;
 
-    // make simple frame and MOG2 mask
+    // Make simple frame and MOG2 mask
     Mat frame, MOGMask, foregroundImg, backgroundImage, backgroundImg;
+
+    double learning_rate = 0.5;
 
     if (exists_test(filename)) {
         cap.open(filename);
     }
-    
-    // init MOG2 BackgroundSubstractor
+
+    // Init MOG2 BackgroundSubstractor
     Ptr<BackgroundSubtractor> BackgroundSubstractor;
-    BackgroundSubstractor = createBackgroundSubtractorMOG2().dynamicCast<BackgroundSubtractor>();;
+    BackgroundSubstractor = createBackgroundSubtractorMOG2(false);
 
     int iCount = 0;
 
@@ -96,35 +99,40 @@ int main(int argc, char* argv[])
         if (frame.empty())
             break;
 
-        // update the background model
+        // Update the background model
         BackgroundSubstractor->apply(frame, MOGMask);
 
-        // some works with noises on frame
-        GaussianBlur(MOGMask, MOGMask, Size(11, 11), 3.5, 3.5);
-        threshold(MOGMask, MOGMask, 10, 255, THRESH_BINARY);
+        // Some works with noises on frame //
+        // Blur the foreground mask to reduce the effect of noise and false positives
 
-        // get the frame number and write it on the current frame
+        // Remove the shadow parts and the noise
+        // To remove the shadow just threshold the foreground image with value 127 as minimum. 128? 254?
+        blur(MOGMask, MOGMask, Size(5, 5), Point(-1, -1));
+        threshold(MOGMask, MOGMask, 128, 255, 0);
+
+        // Get the frame number and write it on the current frame
         rectangle(frame, Point(10, 2), Point(100, 20),
-            cv::Scalar(255, 255, 255), -1);
+            Scalar(255, 255, 255), -1);
 
         stringstream ss;
         ss << cap.get(CAP_PROP_POS_FRAMES);
         string frameNumberString = ss.str();
 
         putText(frame, frameNumberString.c_str(), Point(15, 15),
-            FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
+            FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 0));
 
-        // zeros images
+        // Zeros images
         foregroundImg = Scalar::all(0);
         backgroundImg = Scalar::all(0);
 
-        // using mask to cut foreground
+        // Using mask to cut foreground
         frame.copyTo(foregroundImg, MOGMask);
 
-        // invert mask and cut background
+        // Invert mask and cut background
         backgroundImage = 255 - MOGMask;
         frame.copyTo(backgroundImg, backgroundImage);
 
+        // Show input frame, mask, bg and fg frames
         if (showFrames){
             imshow("Frame", frame);
             imshow("BackGround", backgroundImg);
@@ -132,22 +140,24 @@ int main(int argc, char* argv[])
             imshow("MOG2 Mask", MOGMask);
         }
 
-        if (saveImages){
-            if (i_count != 1) {
-            string counter = std::to_string(iCount);
+        // Save images
+        if (saveImages) {
+            if (iCount != 1) {
+                string counter = to_string(iCount);
 
-            imwrite(savedir + "/original/Frames" + counter + ".jpg", frame);
-            imwrite(savedir + "/background/Frames" + counter + ".jpg", backgroundImg);
-            imwrite(savedir + "/foreground/Frames" + counter + ".jpg", foregroundImg);
+                imwrite(savedir + "/original/Frames" + counter + ".jpg", frame);
+                imwrite(savedir + "/background/Frames" + counter + ".jpg", backgroundImg);
+                imwrite(savedir + "/foreground/Frames" + counter + ".jpg", foregroundImg);
+            }
         }
-        }
-        
+
         int keyboard = waitKey(30);
         if (keyboard == 'q' || keyboard == 27)
             break;
     }
 
-    if (saveVideos){
+    // Save videofiles from Images. U need to save frames first
+    if (saveVideo) {
         Size frameSize = Size((int)cap.get(CAP_PROP_FRAME_WIDTH), (int)cap.get(CAP_PROP_FRAME_HEIGHT));
         int fps = (double)cap.get(CAP_PROP_FRAME_COUNT);
 
@@ -155,5 +165,5 @@ int main(int argc, char* argv[])
         videoWriter("outputVideoBackground.mp4", backgroundPath, frameSize, fps, savedir + "/background/");
     }
 
-	return 0;
+    return 0;
 }
